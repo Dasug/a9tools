@@ -12,6 +12,15 @@ def _cmd_extract_key(cmdl_opts):
   key = parser.extractKey()
   print("Key: 0x" + str(binascii.hexlify(key).decode('UTF-8')))
 
+def _cmd_unpack(cmdl_opts):
+  quiet = cmdl_opts.quiet
+  parser = ArchiveParser.loadFile(cmdl_opts.path)
+  key = parser.extractKey()
+  if not quiet: print("Key: 0x" + str(binascii.hexlify(key).decode('UTF-8')))
+  data = parser.loadRawData()
+  decrypted = parser.decryptData(key, data)
+  print("error: implementation not finished!")
+
 def _cmd_not_implemented(cmdl_opts):
   print("error: not implemented!")
   sys.exit(3)
@@ -49,7 +58,7 @@ def main():
     pass # todo: check for valid directory
   
   handlers = {
-    "unpack": _cmd_not_implemented,
+    "unpack": _cmd_unpack,
     "extract-key": _cmd_extract_key,
     "pack": _cmd_not_implemented,
     "modify": _cmd_not_implemented
