@@ -4,22 +4,38 @@ import sys
 from os.path import exists, getsize
 
 from .archive_parser import ArchiveParser
+from .file_dumper import dump_to_file
 
 __version__ = "0.1"
 
 def _cmd_extract_key(cmdl_opts):
+  quiet = cmdl_opts.quiet
   parser = ArchiveParser.loadFile(cmdl_opts.path)
   key = parser.extractKey()
-  print("Key: 0x" + str(binascii.hexlify(key).decode('UTF-8')))
+  if not quiet: print("Key: 0x" + str(binascii.hexlify(key).decode('UTF-8')))
+  if cmdl_opts.output:
+    dump_to_file(cmdl_opts.output[0], key, cmdl_opts.quiet)
 
 def _cmd_unpack(cmdl_opts):
   quiet = cmdl_opts.quiet
   parser = ArchiveParser.loadFile(cmdl_opts.path)
   key = parser.extractKey()
-  if not quiet: print("Key: 0x" + str(binascii.hexlify(key).decode('UTF-8')))
+  if not quiet: print("Found Key: 0x" + str(binascii.hexlify(key).decode('UTF-8')))
   data = parser.loadRawData()
+  if not quiet: print("Decrypting...")
   decrypted = parser.decryptData(key, data)
   print("error: implementation not finished!")
+
+def _cmd_decrypt(cmdl_opts):
+  quiet = cmdl_opts.quiet
+  parser = ArchiveParser.loadFile(cmdl_opts.path)
+  key = parser.extractKey()
+  if not quiet: print("Found Key: 0x" + str(binascii.hexlify(key).decode('UTF-8')))
+  data = parser.loadRawData()
+  if not quiet: print("Decrypting...")
+  decrypted = parser.decryptData(key, data)
+  if cmdl_opts.output:
+    dump_to_file(cmdl_opts.output[0], decrypted, cmdl_opts.quiet)
 
 def _cmd_not_implemented(cmdl_opts):
   print("error: not implemented!")
@@ -29,15 +45,17 @@ def main():
   cmdl_usage = "%(prog)s [options] action path"
   cmdl_action_explanation = """The following actions are available:
   unpack         unpack an archive
-  extract-key    extract the encryption key and print it as a hexadecimal string
   pack           pack a folder into an archive
-  modify         unpack, modify and re-pack an archive"""
+  modify         unpack, modify and re-pack an archive
+  extract-key    just extract the archive encryption key
+  decrypt        just decrypt the archive without unpacking it"""
   cmdl_version = __version__
   cmdl_parser = argparse.ArgumentParser(usage=cmdl_usage, epilog=cmdl_action_explanation, formatter_class=argparse.RawDescriptionHelpFormatter)
 
+  cmdl_parser.add_argument("-o", "--output", action="store", dest="output", nargs=1, help="output directory or file")
   cmdl_parser.add_argument("-q", "--quiet", action="store_true", dest="quiet", help="do not show output")
   cmdl_parser.add_argument("-v", "--version", action="version", version=cmdl_version)
-  cmdl_parser.add_argument("action", action="store", metavar="action", choices=['unpack', 'extract-key', 'pack', 'modify'], help="action to perform")
+  cmdl_parser.add_argument("action", action="store", metavar="action", choices=['unpack', 'extract-key', 'decrypt', 'pack', 'modify'], help="action to perform")
   cmdl_parser.add_argument("path", action="store", help="path of file or directory")
 
 
@@ -46,7 +64,7 @@ def main():
   action = cmdl_opts.action
   file_path = cmdl_opts.path
 
-  if action in ["extract-key", "unpack", "modify"]:
+  if action in ["extract-key", "unpack", "modify", "decrypt"]:
     if not exists(file_path):
       print("error: no such file or directory!")
       sys.exit(1);
@@ -60,6 +78,7 @@ def main():
   handlers = {
     "unpack": _cmd_unpack,
     "extract-key": _cmd_extract_key,
+    "decrypt": _cmd_decrypt,
     "pack": _cmd_not_implemented,
     "modify": _cmd_not_implemented
   }
