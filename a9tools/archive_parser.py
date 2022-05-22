@@ -38,6 +38,53 @@ class ArchiveParser:
       result[i] = file_byte ^ ((data_byte + fixed_byte)&0xff)
     return result
 
+  def unpackData(self, decrypted_data):
+    dec_data_length = len(decrypted_data)
+    # not exactly sure what's up with this but apparently we need this
+    header_length = int.from_bytes(decrypted_data[:4], "little")
+    # if header length is unreasonably large or too small, we probably don't have a header
+    if dec_data_length < header_length and header_length < (dec_data_length * 0x10):
+      decrypted_data = decrypted_data[4:] # data starts after header length indicator
+      dec_data_length -= 4
+    else:
+      header_length = 0
+    
+    # decompression algorithm - mostly reverse engineered, I don't completely understand it
+    flags = 0
+    r = 0xfee
+    inPosition = 0
+    text_buf = bytearray(0x1000) # create empty buffer of length 4096
+    unpacked_data = bytearray()
+
+    while(inPosition < dec_data_length):
+      if (flags & 0x100) == 0:
+        inByte = decrypted_data[inPosition]
+        inPosition+=1
+        flags = int.from_bytes([0xff, inByte], "big")
+      if (flags & 1) == 0:
+        if (inPosition+1) >= dec_data_length: # end of data reached
+          break
+        firstByte = decrypted_data[inPosition]
+        secondByte = decrypted_data[inPosition+1]
+        inPosition+=2
+        for k in range(0,(secondByte & 0xf)+3):
+          outByte = text_buf[(firstByte | (secondByte & 0xf0) << 4) + k & 0xfff]
+          unpacked_data.append(outByte)
+          text_buf[r] = outByte
+          r = (r+1) & 0xfff
+      else:
+        if inPosition >= dec_data_length: # end of data reached
+          break
+        inByte = decrypted_data[inPosition]
+        inPosition+=1
+        unpacked_data.append(inByte)
+        text_buf[r] = inByte
+        r = (r+1) & 0xfff;
+
+      flags = flags >> 1
+    
+    return unpacked_data
+
   @staticmethod
   def loadFile(path):
     """"Open the file and return an ArchiveParser instance """
